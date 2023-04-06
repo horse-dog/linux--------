@@ -60,8 +60,8 @@
 #### arp 命令
 
 - arp -a 查看所有 arp 映射缓存
-- arp -d <ipAddr> 删除 ipAddr 对应的 arp 表项
-- arp -s <ipAddr> <macAddr> 添加 arp 表项
+- arp -d `<ipAddr>` 删除 ipAddr 对应的 arp 表项
+- arp -s `<ipAddr>` `<macAddr>` 添加 arp 表项
 
 ### DNS 协议
 
@@ -271,20 +271,19 @@
   Host: www.baidu.com
   Connection: close
   ```
-
 - HTTP请求方法
 
-  | 请求方法 |                            含 义                             |
-  | :------: | :----------------------------------------------------------: |
-  |   GET    |         申请获取资源，而不对服务器产生任何其他影响。         |
-  |   HEAD   | 和 GET 方法类似，不过仅要求服务器返回头部信息，而不需要传输任何实际内容。 |
-  |   POST   |                客户端向服务器提交数据的方法。                |
-  |   PUT    |                        上传某个资源。                        |
-  |  DELETE  |                        删除某个资源。                        |
-  |  TRACE   | 要求目标服务器返回原始的HTTP请求的内容。它可用于查看中间服务器（比如代理服务器）对HTTP请求的影响。 |
-  | OPTIONS  | 查看服务器对某个特定URL都支持哪些请求方法。可以吧URL设置为 *，从而获取服务器支持的所有请求方法。 |
-  | CONNECT  |  用于某些代理服务器，它们能把请求的连接转换为一个安全隧道。  |
-  |  PATCH   |                    对某个资源做部分修改。                    |
+  | 请求方法 |                                               含 义                                               |
+  | :------: | :------------------------------------------------------------------------------------------------: |
+  |   GET   |                            申请获取资源，而不对服务器产生任何其他影响。                            |
+  |   HEAD   |             和 GET 方法类似，不过仅要求服务器返回头部信息，而不需要传输任何实际内容。             |
+  |   POST   |                                   客户端向服务器提交数据的方法。                                   |
+  |   PUT   |                                           上传某个资源。                                           |
+  |  DELETE  |                                           删除某个资源。                                           |
+  |  TRACE  | 要求目标服务器返回原始的HTTP请求的内容。它可用于查看中间服务器（比如代理服务器）对HTTP请求的影响。 |
+  | OPTIONS |  查看服务器对某个特定URL都支持哪些请求方法。可以吧URL设置为 *，从而获取服务器支持的所有请求方法。  |
+  | CONNECT |                     用于某些代理服务器，它们能把请求的连接转换为一个安全隧道。                     |
+  |  PATCH  |                                       对某个资源做部分修改。                                       |
 
 #### HTTP应答
 
@@ -298,25 +297,23 @@
   Set-Cookie: BAIDUID=A5B6C72D68CF639CE889FD79A03FBD8:FG=1; expires=Wed,04 -Jul-42 00:10:47 GMT; path=/; domain=.baidu.com
   Via: 1.0 localhost (squid/3.0 STABLE18)
   ```
-
 - HTTP状态码
 
-  | 状态类型       | 状态码和状态信息                  | 含 义                                                        |
-  | -------------- | --------------------------------- | ------------------------------------------------------------ |
-  | 1xx 信息       | 100 Continue                      | 服务器收到了客户端的请求行和头部信息，告诉客户端继续发送数据部分。 |
-  | 2xx 成功       | 200 OK                            | 请求成功。                                                   |
-  | 3xx 重定向     | 301 Moved Permanently             | 资源被转移了，请求将被重定向。                               |
-  | 3xx 重定向     | 302 Found                         | 通知客户端资源能在其他地方找到，但需要使用GET方法获取。      |
-  | 3xx 重定向     | 304 Not Modified                  | 表示申请的资源没有更新，和之前获得的相同。                   |
+  | 状态类型       | 状态码和状态信息                  | 含 义                                                                                                 |
+  | -------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------- |
+  | 1xx 信息       | 100 Continue                      | 服务器收到了客户端的请求行和头部信息，告诉客户端继续发送数据部分。                                    |
+  | 2xx 成功       | 200 OK                            | 请求成功。                                                                                            |
+  | 3xx 重定向     | 301 Moved Permanently             | 资源被转移了，请求将被重定向。                                                                        |
+  | 3xx 重定向     | 302 Found                         | 通知客户端资源能在其他地方找到，但需要使用GET方法获取。                                               |
+  | 3xx 重定向     | 304 Not Modified                  | 表示申请的资源没有更新，和之前获得的相同。                                                            |
   | 3xx 重定向     | 307 Temporary Redirect            | 通知客户端资源能在其他地方找到，与302的区别在于客户端可以使用和原始请求相同的请求方法来访问目标资源。 |
-  | 4xx 客户端错误 | 400 Bad Request                   | 通知客户端请求错误。                                         |
-  | 4xx 客户端错误 | 401 Unauthorized                  | 请求需要认证信息。                                           |
-  | 4xx 客户端错误 | 403 Forbidden                     | 访问被服务器禁止，通常是由于客户端没有权限访问该资源。       |
-  | 4xx 客户端错误 | 404 Not Found                     | 找不到资源。                                                 |
-  | 4xx 客户端错误 | 407 Proxy Authentication Required | 客户端需要先获得代理服务器的认证。                           |
-  | 5xx 服务器错误 | 500 Internal Server Error         | 通用服务器错误。                                             |
-  | 5xx 服务器错误 | 503 Service Unavailable           | 暂时无法访问服务器。                                         |
-
+  | 4xx 客户端错误 | 400 Bad Request                   | 通知客户端请求错误。                                                                                  |
+  | 4xx 客户端错误 | 401 Unauthorized                  | 请求需要认证信息。                                                                                    |
+  | 4xx 客户端错误 | 403 Forbidden                     | 访问被服务器禁止，通常是由于客户端没有权限访问该资源。                                                |
+  | 4xx 客户端错误 | 404 Not Found                     | 找不到资源。                                                                                          |
+  | 4xx 客户端错误 | 407 Proxy Authentication Required | 客户端需要先获得代理服务器的认证。                                                                    |
+  | 5xx 服务器错误 | 500 Internal Server Error         | 通用服务器错误。                                                                                      |
+  | 5xx 服务器错误 | 503 Service Unavailable           | 暂时无法访问服务器。                                                                                  |
 - Cookie：HTTP是一种无状态的协议，即每个HTTP请求之间没有任何上下文关系。对于交互式Web应用程序，要求承上启下，使用的解决方案是Cookie。Cookie是服务器发送给客户端的特殊信息（通过HTTP应答的头部字段"Set-Cookie"），客户端每次向服务器发送请求的时候都需要带上这些信息（通过HTTP请求的头部字段"Cookie"）。这样服务器就可以区分不同的客户了。基于浏览器的自动登录就是用Cookie实现的。
 
 # 第二篇 深入解析高性能服务器编程
@@ -556,16 +553,16 @@ ssize_t recv(int sockfd, void* buf, size_t len, int flags);
 ssize_t send(int sockfd, const void* buf, size_t len, int flags);
 ```
 
-| 选项名        | 含 义                                                        | send | recv |
-| ------------- | ------------------------------------------------------------ | ---- | ---- |
-| MSG_CONFIRM   | 指示数据链路层协议持续监听对方的应答，直到得到回复。它仅能用于SOCK_DGRAM和SOCK_RAW类型的socket | Y    | N    |
-| MSG_DONTROUTE | 不查看路由表，直接将数据发送给本地局域网络内的主机。这表示发送者确切地知道目标主机就在本地网络上 | Y    | N    |
-| MSG_DONTWAIT  | 对socket的这次操作将是非阻塞的                               | Y    | Y    |
+| 选项名        | 含 义                                                                                                                                    | send | recv |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---- | ---- |
+| MSG_CONFIRM   | 指示数据链路层协议持续监听对方的应答，直到得到回复。它仅能用于SOCK_DGRAM和SOCK_RAW类型的socket                                           | Y    | N    |
+| MSG_DONTROUTE | 不查看路由表，直接将数据发送给本地局域网络内的主机。这表示发送者确切地知道目标主机就在本地网络上                                         | Y    | N    |
+| MSG_DONTWAIT  | 对socket的这次操作将是非阻塞的                                                                                                           | Y    | Y    |
 | MSG_MORE      | 告诉内核应用程序还有更多的数据要发送，内核将超时等待新数据写入TCP发送缓冲区后一并发送。这样可防止TCP发送过多小的报文段，从而提高传输效率 | Y    | N    |
-| MSG_WAITALL   | 读操作仅在读取到指定数量的字节后才返回                       | N    | Y    |
-| MSG_PEEK      | 窥视读缓存中的数据，此次读操作不会导致这些数据被清除         | N    | Y    |
-| MSG_OOB       | 发送或接收紧急数据                                           | Y    | Y    |
-| MSG_NOSIGNAL  | 往读端关闭的管道或者socket连接中写数据时不引发SIGPIPE信号    | Y    | N    |
+| MSG_WAITALL   | 读操作仅在读取到指定数量的字节后才返回                                                                                                   | N    | Y    |
+| MSG_PEEK      | 窥视读缓存中的数据，此次读操作不会导致这些数据被清除                                                                                     | N    | Y    |
+| MSG_OOB       | 发送或接收紧急数据                                                                                                                       | Y    | Y    |
+| MSG_NOSIGNAL  | 往读端关闭的管道或者socket连接中写数据时不引发SIGPIPE信号                                                                                | Y    | N    |
 
 #### UDP数据读写
 
@@ -657,12 +654,11 @@ int setsockopt(int sockfd, int level, int option_name, const void* option_value,
 #### SO_LINGER选项
 
 - 默认情况下，使用 close 系统调用关闭套接字描述符时，close将立即返回，TCP模块负责把该socket对应的TCP发送缓冲区中残留的数据发送给对方。
-
 - 设置或读取 SO_LINGER 选项的值的时候，option_value 需要指向一个专用结构体
 
   ```cpp
   #include <sys/socket.h>
-  
+
   struct linger {
     int l_onoff;	/* 开启或关闭linger选项 */
     int l_linger; /* 滞留时间 */
@@ -742,19 +738,194 @@ const char* gai_strerror(int error);
 
 ### pipe 函数
 
+```cpp
+#include <unistd.h>
+
+/**
+ * @brief 创建一对管道描述符
+ * @param fd 用于存放创建得到的描述符
+ * @return 0 succeed, -1 failed.
+ */
+int pipe(int fd[2]);
+```
+
+- fd[0]可读，fd[1]可写。只能进行单向的数据传输：fd[1] -> fd[0]。
+- 默认情况下，这对文件描述符都是阻塞的，read空管道，则read会被阻塞，直到管道内有数据可读。write满的管道，则write阻塞，直到管道有足够的空闲空间可用。
+- 如果fd[0]和fd[1]都是非阻塞的。则read和write会有不同行为。（见第八章）
+- 如果写端fd[1]的引用计数减少到0，则对该管道的读端fd[0]的read操作将返回0，即读取到了文件结束标记EOF。
+- 如果读端fd[0]的引用计数减少到0，即没有任何进程需要从管道读取数据，则对该管道的写端fd[1]的write操作将失败，并引发SIGPIPE信号。
+- 可以使用fcntl函数修改管道容量。
+- 创建双向管道，domain只能为AF_UNIX域，type，protocol参数通socket函数，fd[2]参数同pipe函数。
+
+```cpp
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int socketpair(int domain, int type, int protocol, int fd[2]);
+```
+
 ### dup函数和dup2函数
+
+```cpp
+/**
+ * @brief 创建一个新描述符，新描述符与fd指向相同的文件、管道或者网络链接。并且duo返回的文件描述符总是取系统当前可用的最小的整数值。
+ * @param fd 需要复制的文件描述符
+ * @return 新的文件描述符，失败时返回-1 
+ */
+int dup(int fd);
+
+/**
+ * @brief 与dup类似，但返回的是第一个不小于dstfd的整数值。
+ * @param srcfd 需要复制的文件描述符
+ * @param dstfd 想要复制到的文件描述符
+ * @return 新的文件描述符，失败时返回-1 
+ */
+int dup2(int srcfd, int dstfd);
+```
+
+- 复制后，该进程会新增一个文件描述符表项，新增的文件描述符指向的打开文件表项和它所复制的文件描述符指向的打开文件表项是同一个表项。
+
+- dup和dup2创建的文件描述符并不继承源文件描述符的属性，目前文件描述符标志仅有close-on-exec一种。因为这个标志是文件描述符标志而不是文件状态标志。
+
+- CGI服务器的原理，把connfd复制到标准输出上，向标准输出写即为向客户端发送数据。
 
 ### readv函数和writev函数
 
+```cpp
+#include <sys/uio.h>
+
+ssize_t readv(int fd, const struct iovec* vector, int count);
+ssize_t writev(int fd, const struct iovec* vector, int count);
+```
+
 ### sendfile函数
+
+```cpp
+#include <sys/sendfile.h>
+
+/**
+ * @brief 将数据从in_fd复制到out_fd,完全在内核中进行(零拷贝)
+ * @param out_fd 目的描述符
+ * @param in_fd 源描述符
+ * @param offset 指定从哪个位置开始读，如果为空则使用起始位置。
+ * @param count 指定传输的字节数
+ * @return 成功时返回传输的字节数，失败时返回-1
+ */
+ssize_t sendfile(int out_fd, int in_fd, off_t* offset, size_t count);
+```
+
+- in_fd 必须是一个支持类似mmap函数的文件描述符，即它必须指向真实的文件，不能是socket和管道
+
+- out_fd 必须是一个socket
 
 ### mmap函数和munmap函数
 
+```cpp
+#include <sys/mman.h>
+
+/**
+ * @brief mmap函数用于申请一段内存空间。我们可以将这段内存空间作为进程间通信的共享内存，也可以将文件直接映射到其中
+ * @param start 该参数允许用户使用某个特定的地址作为这段地址的起始地址。如果它为NULL，则系统自动分配一个地址
+ * @param length 指定内存段的长度
+ * @param prot 该参数用于设置内存段的访问权限，可以取下面几个值的按位或：
+ *  PROT_READ  内存段可读
+ *  PROT_WRITE 内存段可写
+ *  PROT_EXEC  内存段可执行
+ *  PROT_NONE  内存段不能被访问
+ * @param flags 该参数控制内存段内容被修改后程序的行为，可以取某些值的按位或
+ * @param fd 被映射文件对应的文件描述符
+ * @param offset 设置从文件的何处开始映射
+ * @return 成功时返回指向目标内存区域的指针，失败则返回MAP_FAILED((void*)-1)
+ */
+void* mmap(void* start, size_t length, int prot, int flags, int fd, off_t offset);
+
+/**
+ * @brief munmap函数用于释放由mmap函数创建的内存空间 
+ * @param start 映射地址
+ * @param length 映射长度
+ * @return 0 succeed, -1 failed.
+ */
+int munmap(void* start, size_t length);
+```
+
+- flags参数的取值。其中MAP_SHARED和MAP_PRIVATE是互斥的，不能同时指定。且必须指定其中之一。
+
+| 常用值 | 含 义 |
+| --- | --- |
+| MAP_SHARED | 在进程间共享这段内存。对该内存段的修改将反映到被映射的文件中。它提供了进程间共享内存的POSIX方法 |
+| MAP_PRIVATE | 内存段欸调用进程所私有，对该内存段的修改不会反映到被映射的文件中 |
+| MAP_ANONYMOUS | 这段内存不是从文件映射而来的。其内容被初始化为全0。这种情况下，mmap函数的最后两个参数将被忽略 |
+| MAP_FIXED | 内存段必须位于start参数指定的地址处，start必须是内存页面大小（4096字节）的整数倍 |
+| MAP_HUGETLB | 按照"大内存页面"来分配内存空间。"大内存页面"的大小可通过/proc/meminfo文件来查看 |
+
 ### splice函数
+
+```cpp
+#include <fcntl.h>
+
+/**
+ * @brief 用于在两个文件描述符间移动数据，也是零拷贝操作
+ * @param fd_in 待输入数据的文件描述符，如果fd_in是一个管道文件描述符，那么off_in参数必须被设置为NULL
+ * @param off_in 表示从输入数据流的何处开始读取数据，如果为NULL，表示从当前偏移位置读取
+ * @param fd_out 待输出数据的文件描述符
+ * @param off_out 在输出数据流的何处开始写入数据
+ * @param len 指定移动数据的长度
+ * @param flags 控制如何移动，某些值的按位与
+ * @return 成功时返回移动字节的数量。失败时返回-1
+ */
+ssize_t splice(int fd_in, loff_t* off_in, int fd_out, loff_t* off_out, size_t len, unsigned int flags);
+```
+
+- 使用splice函数时，fd_in和fd_out必须至少有一个是管道文件描述符。
+
+- flags参数
+
+<img src="img/11.png" style="zoom:80%" />
+
+
+- splice函数可能产生的errno及其含义
+
+<img src="img/12.png" style="zoom:80%" />
+
 
 ### tee函数
 
+```cpp
+#include <fcntl.h>
+
+/**
+ * @brief 在两个管道文件描述符之间复制数据，零拷贝操作。它不消耗数据，因此源文件描述符上的数据仍然可以用于后续的读操作
+ * @param fd_in 输入数据流的管道描述符
+ * @param fd_out 输出数据流的管道描述符
+ * @param len 复制文件的长度
+ * @param flags 同splice函数 
+ * @return 成功时返回移动字节的数量。失败时返回-1
+ */
+ssize_t tee(inf fd_in, int fd_out, size_t len, unsigned int flags);
+```
+
 ### fcntl函数
+
+```cpp
+#include <fcntl.h>
+
+int fcntl(int fd, int cmd, ...);
+```
+
+| 操作分类 | 操作 | 含义 | 第三个参数的类型 | 成功时的返回值 |
+| --- | --- | --- | --- | --- |
+| 复制文件描述符 | F_DUPFD | 创建一个新的文件描述符，其值大于或等于arg | long | 新创建的文件描述符的值 |
+| 复制文件描述符 | F_DUPFD_CLOEXEC | 与F_DUPFD类似，不过在创建文件描述符的同时，设置其close-on-exec标志 | long | 新创建的文件描述符的值 |
+| 获取和设置文件描述符的标志 | F_GETFD | 获取fd的标志，比如close-on-exec标志 | 无 | fd的标志 |
+| 获取和设置文件描述符的标志 | F_SETFD | 设置fd的标志 | long | 0 |
+| 获取和设置文件状态标志 | F_GETFL | 获取fd的状态标志，包括可由open系统调用设置的标志和访问模式 | void | fd的状态标志 |
+| 获取和设置文件状态标志 | F_SETFL | 设置fd的状态标志，但部分标志是不能被修改的（比如访问模式标志） | long | 0 |
+| 管理信号 | F_GETOWN | 获得SIGIOh和SIGURG信号的宿主进程的PID或进程组的组ID | 无 | 信号的宿主进程的PID或进程组的组ID |
+| 管理信号 | F_SETOWN | 设置SIGIOh和SIGURG信号的宿主进程的PID或进程组的组ID | long | 0 |
+| 管理信号 | F_GETSIG | 获取当应用程序被通知fd可读或可写时，是哪个信号通知该事件的 | 无 | 信号值，0表示SIGIO | 
+| 管理信号 | F_SETSIG | 设置当fd可读或可写时，系统应该触发哪个信号来通知应用程序 | long | 0 |
+| 操作管道容量 | F_GETPIPE_SZ | 获取由fd指定的管道的容量 | 无 | 管道容量 |
+| 操作管道容量 | F_SETPIPE_SZ | 设置由fd指定的管道的容量 | long | 0 |
 
 ## 第 7 章 Linux 服务器编程规范
 
@@ -897,6 +1068,3 @@ const char* gai_strerror(int error);
 ## 第 16 章 服务器调制、调试和测试
 
 ## 第 17 章 系统监测工具
-
-
-
