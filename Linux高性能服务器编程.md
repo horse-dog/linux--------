@@ -931,35 +931,239 @@ int fcntl(int fd, int cmd, ...);
 
 ### 日志
 
+<img src="img/13.png" style="zoom:80%" />
+
+```cpp
+#include <syslog.h>
+
+/**
+ * @brief 用户进程可以使用该函数与rsyslogd守护进程通信
+ * @param priority 设施值与日志级别的按位与，设施值通常不设置，默认为LOG_USER
+ * @param message 日志格式串
+ * @param ... args 
+ */
+void syslog(int priority, const char* message, ...);
+
+#define LOG_EMERG   0 /* 系统不可用 */
+#define LOG_ALERT   1 /* 报警，需要立即采取动作 */
+#define LOG_CRIT    2 /* 非常严重的错误 */
+#define LOG_ERR     3 /* 错误 */
+#define LOG_WARNING 4 /* 警告 */
+#define LOG_NOTICE  5 /* 通知 */
+#define LOG_INFO    6 /* 信息 */
+#define LOG_DEBUG   7 /* 调试 */
+
+/**
+ * @brief 控制syslog的默认输出方式
+ * @param ident 该参数指定的字符串会被添加到日志消息的日期和时间之后，通常被设置为程序的名字
+ * @param logopt 以下值的按位与
+ *  #define LOG_PID    0x01 在日志中包含程序PID
+ *  #define LOG_CONS   0x02 如果消息不能记录到日志文件，则打印到终端
+ *  #define LOG_ODELAY 0x04 延迟打开日志功能直到第一次调用syslog
+ *  #define LOG_NDELAY 0x08 不延迟打开日志功能
+ * @param facility 修改syslog函数的默认设施值
+ */
+void openlog(const char* ident, int logopt, int facility);
+
+/**
+ * @brief 高于maskpri的日志将不会被写入日志
+ * @param maskpri 日志掩码
+ * @return 调用进程先前的日志掩码值 
+ */
+int setlogmask(int maskpri);
+
+/**
+ * @brief 关闭日志功能 
+ */
+int closelog();
+```
+
 ### 用户信息
+
+```cpp
+#include <sys/types.h>
+#include <unistd.h>
+
+uid_t getuid();
+uid_t geteuid();
+gid_t getgid();
+gid_t getegid();
+int setuid(uid_t uid);
+int seteuid(uid_t uid);
+int setgid(gid_t gid);
+int setegid(gid_t gid);
+```
 
 ### 进程间关系
 
+- 进程组：多个关联的进程组成一个进程组，进程组具有进程组长
+
+```cpp
+pid_t getpgid(pid_t pid);
+
+// 只能设置自己或者子进程的PGID，子进程调用exec系列函数后，也不能再在父进程中设置它的PGID
+int setpgid(pid_t pid, pid_t pgid);
+```
+
+- 会话：多个关联的进程组组成一个会话，会话具有会话话长。例如一个作业在一个终端打开，则这个作业的多个进程被分为两组，前台进程组和后台进程组，前台进程组通常可以接收终端IO的控制。这个作业的会话首领和前台进程组组长就是控制终端运行所在的进程。
+
+```cpp
+// 调用该函数的进程不能是进程组长
+pid_t setsid(void);
+
+pid_t getsid(pid_t pid);
+```
+
+- ps命令
+
+```shell
+ps -o pid, ppid, pgid, sid, comm | less
+```
+
 ### 系统资源限制
+
+```cpp
+#include <sys/resource.h>
+int getrlimit(int resource, struct rlimit* rlim);
+int setrlimit(int resource, const struct rlimit* rlim);
+
+struct rlimit {
+  rlim_t rlim_cur;
+  rlim_t rlim_max;
+};
+```
 
 ### 改变工作目录和根目录
 
+```cpp
+#include <unistd.h>
+
+char* getcwd(char* buf, size_t size);
+// 修改工作目录
+int chdir(const char* path);
+
+// 修改根目录，例如：chroot("/home/mjs")，则以后进程认为"/"根目录就是"/home/mjs"
+int chroot(const char* path);
+```
+
 ### 服务器程序后台化
+
+```cpp
+#include <unistd.h>
+
+/**
+ * @将进程转换为守护进程
+ * @param nochdir 开启该选项，则不会切换工作目录到根
+ * @param noclose 开启该选项，则不会关闭标准IO设备
+ */
+int daemon(int nochdir, int noclose);
+```
 
 ## 第 8 章 高性能服务器程序框架
 
 ### 服务器模型
 
+#### C/S模型
+
+- 客户端/服务器模型
+
+#### P2P模型
+
+- 点对点模型，所有客户端兼做服务器，可能会存在一个发现服务器用于对各个点进行管理
+
 ### 服务器编程框架
 
+| 模块 | 单个服务器程序 | 服务器集群 |
+| --- | --- | --- |
+| IO处理单元 | 处理客户连接，读写网络数据 | 作为接入服务器，实现负载均衡 |
+| 逻辑单元 | 业务进程或线程 | 逻辑服务器 |
+| 网络存储单元 | 本地数据库、文件或缓存 | 数据库服务器 |
+| 请求队列 | 各单元之间的通信方式 | 各服务器之间的永久TCP连接 |
+
 ### IO模型
+
+| IO模型 | 读写操作和阻塞阶段 |
+| --- | --- |
+| 阻塞IO | 程序阻塞与读写函数 |
+| IO复用 | 程序阻塞与IO系统调用，但可同时监听多个IO事件，对IO本身的读写操作时非阻塞的 |
+| SIGIO信号 | 信号触发读写就绪事件，用户程序执行读写操作。程序没有阻塞阶段 |
+| 异步IO | 内核执行读写操作并触发读写完成事件。程序没有阻塞阶段 |
 
 ### 两种高效的事件处理模式
 
 #### Reactor模式
 
+- 主线程往epoll内核事件表中注册socket上的读就绪事件。
+
+- 主线程调用epoll_wait等待socket上有数据可读。
+
+- 当socket上有数据可读时，epoll_wait通知主线程。主线程则将socket可读事件放入请求队列。
+
+- 睡眠在该请求队列上的某个工作线程被唤醒，它从socket读取数据，并处理客户请求，然后往epoll内核事件表中注册该socket上的写就绪事件。
+
+- 主线程调用epoll_wait等待socket可写
+
+- 当socket可写时，epoll_wait通知主线程。主线程将socket可写事件放入请求队列。
+
+- 睡眠在请求队列上的某个工作线程被唤醒，它往socket上写入服务器处理客户请求的结果。
+
+- 注意，监听端口的可读事件即到达了新的客户端连接请求，Reactor模式中accept这个客户连接应该时交给工作线程来完成的。
+
 #### Proactor模式
+
+- 主线程调用aio_read函数向内核注册socket上的读完成事件，并告诉内核用户读缓冲区的位置，以及读操作完成时如何通知应用程序（以信号为例）。
+
+- 主线程继续处理其他逻辑。
+
+- 当socket上的数据被读入用户缓冲区后，内核将向应用程序发送一个信号，以通知应用程序数据已经可用。
+
+- 应用程序预先定义好的信号处理函数选择一个工作线程来处理客户请求。工作线程处理完客户请求之后，调用aio_write函数向内核注册socket上的写完成事件，并告诉内核用户写缓冲的位置，以及写操作完成时如何通知应用程序（仍然以信号为例）。
+
+- 主线程继续处理其他逻辑。
+
+- 当用户缓冲区的数据被写入socket之后，内核将向应用程序发送一个信号，以通知应用程序数据以及发送完毕。
+
+- 应用程序预先定义好的信号处理函数选择一个工作线程来作善后处理，比如决定是否关闭socket。
+
+- 注意，Proactor模式下，IO任务是由内核或主线程负责完成的，工作线程只负责业务逻辑。
 
 ### 两种高效的并发模式
 
+#### 半同步/半异步模式
+
+- 半同步/半反应堆模式
+
+  - 异步线程负责监听socket事件，同步线程负责处理业务逻辑。
+
+  - 主线程和工作线程共享请求队列，队列存取需要加锁保护，耗费了CPU
+
+  - 每个工作线程只能处理一个客户请求。如果客户数量较多，而工作线程少，则任务会堆积，如果增加工作线程数量，则工作线程的切换也会耗费大量CPU时间。
+
+- 高效的半同步/半异步模式
+
+  - <img src="img/14.png" style="zoom:80%" />
+
+  - 主线程只负责监听socket，当有新的连接到来时，主线程就接受之并将新返回的连接socket派发给某个工作线程，此后该新socket上的任何IO操作都由被选中的工作线程来处理，直到客户端关闭连接。
+
+  - 主线程向工作线程派发socket最简单的方式，是往它和工作线程之间的管道里写数据。工作线程检测管道上由数据可读时，就分析是否是一个新的客户连接请求到来。如果是，则把该新的socket上的读写事件注册到自己的epoll内核事件表中。
+
+#### 领导者/追随者模式
+
+- 在任意时间点，程序都仅有一个领导者线程，它负责监听IO事件。其他线程都是追随者。它们休眠在线程池中等待成为新的领导者。
+
+- 当前的领导者如果检测到IO事件，首先要从线程池中推选出新的领导者线程，然后处理IO事件。此时，新的领导者等待新的IO事件，而原来的领导者则处理IO事件，二者实现了并发。
+
 ### 有限状态机
 
+- 使用示例：http请求报文的解析
+
 ### 提高服务器性能的其他建议
+
+#### 池化技术
+
+#### 数据复制
+
+#### 上下文切换和锁
 
 ## 第 9 章 I/O 复用
 

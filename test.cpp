@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-int main() {
+int test_dup() {
     int fd, newfd;
     int flags;
 
@@ -60,4 +60,25 @@ int main() {
     close(newfd);
 
     return 0;
+}
+
+#include <signal.h>
+
+void handler(int x) {
+    printf("sigusr1...\n");
+}
+
+void test_signal() {
+
+    signal(SIGUSR1, handler);
+    raise(SIGUSR1);
+    raise(SIGUSR1);
+
+}
+
+int main() {
+
+    test_signal();
+    return 0;
+
 }
