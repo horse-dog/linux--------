@@ -755,7 +755,7 @@ int pipe(int fd[2]);
 - 如果写端fd[1]的引用计数减少到0，则对该管道的读端fd[0]的read操作将返回0，即读取到了文件结束标记EOF。
 - 如果读端fd[0]的引用计数减少到0，即没有任何进程需要从管道读取数据，则对该管道的写端fd[1]的write操作将失败，并引发SIGPIPE信号。
 - 可以使用fcntl函数修改管道容量。
-- 创建双向管道，domain只能为AF_UNIX域，type，protocol参数通socket函数，fd[2]参数同pipe函数。
+- 创建双向管道，domain只能为AF_UNIX域，type，protocol参数同socket函数，fd[2]参数同pipe函数。
 
 ```cpp
 #include <sys/types.h>
@@ -1161,39 +1161,307 @@ int daemon(int nochdir, int noclose);
 
 #### 池化技术
 
+- 进程池、线程池
+
+- 内存池
+
+- 数据库连接池
+
 #### 数据复制
 
+- ftp服务器只需要检测用户请求的目标文件是否存在，以及客户是否有读取它的权限，此时调用sendfile函数实现零拷贝
+
+- 两个进程之间传递大量数据时，应该考虑使用共享内存，而不是使用管道或者消息队列。
+
 #### 上下文切换和锁
+
+- 进程和线程切换导致的系统开销，因此，为每个客户连接都创建一个工作线程的服务器模型是不可取的。
+
+- 锁通常被认为是导致服务器效率低下的一个因素，服务器如果有更好的解决方案，就应该避免使用锁。
+
+- 如果服务器必须使用锁，则可以考虑减小锁的粒度，比如使用读写锁。
 
 ## 第 9 章 I/O 复用
 
 ### select系统调用
 
+```cpp
+#include <sys/select.h>
+
+/**
+ * @brief select IO复用函数
+ * @param nfds 指定被监听的文件描述符的总数，它通常被设置为select监听的所有描述符的最大值加1，因为文件描述符是从0开始计数的
+ * @param readfds 用户对这个数组里的描述符的读事件感兴趣，select返回时，内核将修改它来通知应用程序哪些文件描述符已经就绪
+ * @param writefds 用户对这个数组里的描述符的写事件感兴趣，select返回时，内核将修改它来通知应用程序哪些文件描述符已经就绪
+ * @param exceptfds 用户对这个数组里的描述符的异常事件感兴趣，select返回时，内核将修改它来通知应用程序哪些文件描述符已经就绪
+ * @param timeout 设置超时时间
+ * @return 成功时返回就绪(可读、可写、异常)文件描述符的总数。失败时返回-1，超时时返回0
+ */
+int select(int nfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, struct timeval* timeout);
+
+FD_ZERO(fd_set* fdset); /* 清楚fdset的所有位 */
+FD_SET(int fd, fd_set* fdset); /* 设置fdset的位fd */
+FD_CLR(int fd, fd_set* fdset); /* 清除fdset的位fd */
+int FD_ISSET(int fd, fd_set *fdset); /* 测试fdset的位fd是否被设置 */
+```
+
+- fd_set结构体仅包含一个整形数组，该数组的每个元素的每一位(bit)标记一个文件描述符。fd_set能容纳的文件描述符数量由FD_SETSIZE指定，这就限制了select能同时处理的文件描述符的总量。
+
+- 下列情况下socket可读
+
+  - socket内核接收缓冲区中字节数大于或等于其低水位标记SO_RCVLOWAT。此时我们可以无阻塞地读该socket，并且读操作返回的字节数大于0。
+
+  - socket通信的对方关闭连接。此时对该socket的读操作将返回0。
+
+  - 监听socket上有新的连接请求。
+
+  - socket上有未处理的错误。此时我们可以使用getsockopt函数来读取和清除该错误。
+
+- 下列情况下socket可写
+
+  - socket内核发送缓冲区的可用字节数大于或等于其低水位标记SO_SNDLOWAT。此时我们可以无阻塞地写该socket，且写操作返回的字节数大于0。
+
+  - socket的写操作被关闭。对写操作被关闭的socket执行写操作将触发一个SIGPIPE信号。
+
+  - socket使用非阻塞connect连接成功或者失败（超时）之后。
+
+  - socket上有未处理的错误。此时我们可以使用getsockopt来读取和清除该错误。
+
+- 网络程序中，select能处理的异常情况只有一种：socket上接收到带外数据。
+
 #### poll系统调用
+
+```cpp
+#include <poll.h>
+
+int poll(struct pollfd* fds, nfds_t nfds, int timeout);
+
+struct pollfd {
+  int fd;         /* 文件描述符 */
+  short events;   /* 注册的事件 */
+  short revents;  /* 实际发生的事件，由内核填充 */
+};
+```
 
 ### epoll系列系统调用
 
-### 三种IO复用函数的比较
+```cpp
+#include <sys/epoll.h>
 
-### IO复用的高级应用一：非阻塞connect
+/**
+ * @brief 创建epoll描述符
+ * @param size 现在不起作用，只是提示内核事件表需要多啊的
+ * @return epoll描述符 
+ */
+int epoll_create(int size);
 
-### IO复用的高级应用二：聊天室程序
+/**
+ * @brief 操作epoll内核事件表
+ * @param epfd epoll描述符
+ * @param op 指定操作
+ *  EPOLL_CTL_ADD 往事件表注册事件
+ *  EPOLL_CTL_MOD 修改fd上的注册事件
+ *  EPOLL_CTL_DEL 删除fd上的注册事件
+ * @param fd 关心的描述符，会作为红黑树的键
+ * @param event 关系的fd上发生的事件
+ */
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event* event);
 
-### IO复用的高级应用三：同时处理TCP和UDP服务
+struct epoll_event {
+  __uint32_t events;  /* epoll事件 */
+  epoll_data_t data;  /* 用户数据 */
+};
 
-### 超级服务xinetd
+typedef union epoll_data {
+  void* ptr;
+  int fd;
+  uint32_t u32;
+  uint64_t u64;
+} epoll_data_t;
+
+int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout);
+```
+
+- LT和ET模式
+  
+  - 水平触发LT: 如果事件未被处理完毕，事件会被重复通知，epoll默认工作模式
+
+  - 边沿触发ET: 事件仅会被通知一次，要求程序一次性读取和处理事件。epoll高效工作模式
+
+- 常用epoll事件
+
+| 事件 | 含义 |
+| --- | --- |
+| EPOLLIN | 套接字可读事件，监听套接字检测到连接请求也输入可读事件 |
+| EPOLLPRI | 紧急数据可读事件 |
+| EPOLLOUT | 可写事件，如果fd的内核发生缓存区未满，且监听了写事件，就会触发该事件 |
+| EPOLLERR | 发生错误 |
+| EPOLLHUP | 套接字挂起 |
+| EPOLLRDHUP | 套接字关闭或半关闭事件 |
+| EPOLLONESHOT | fd及其绑定的事件只会触发一次，触发后从红黑树移除 |
+| EPOLLET | 设置边沿触发 |
 
 ## 第 10 章 信号
 
 ### Linux信号概述
 
+#### 发送信号
+
+```cpp
+#include <sys/types.h>
+#include <signal.h>
+
+int kill(pid_t pid, int sig);
+
+// 给自己发送信号
+int raise(int signo);
+
+// 设置闹钟，闹钟超时时会产生SIGALRM信号
+unsigned int alarm(unsigned int seconds);
+
+// 阻塞进程，只有执行了一个信号处理程序并从其中返回时，pause才返回
+int pause(void);
+```
+
+#### 信号处理方式
+
+```cpp
+#include <signal.h>
+
+typedef void (*__sighandler_t)(int);
+
+#define SIG_DFL ((__sighandler_t)0)
+#define SIG_IGN ((__sighandler_t)1)
+```
+
+#### 中断系统调用
+
+- 如果程序在执行处于阻塞状态的系统调用时接收到信号，并且我们为该信号设置了信号处理函数，则默认情况下系统调用将被中断，并且errno被设置为EINTR。
+
+- 可以使用sigaction函数为信号设置SA_RESTART标志以自动重启被该信号中断的系统调用。
+
 ### 信号函数
+
+```cpp
+#include <signal.h>
+
+/**
+ * @brief 为指定信号设定信号处理函数
+ * @param sig 信号
+ * @param handler 处理函数
+ * @return 成功时返回旧的信号处理函数，失败时返回SIG_ERR 
+ */
+__sighandler_t signal(int sig, __sighandler_t handler);
+
+
+/**
+ * @brief 为指定信号设定信号处理函数
+ * @param sig 信号
+ * @param act 结构体，包含新的信号处理函数和一些标志
+ * @param oact 用于返回旧的sigaction
+ * @return 成功返回0，失败返回-1
+ */
+int sigaction(int sig, const struct sigaction* act, struct sigaction* oact);
+
+struct sigaction {
+  union {
+    __sighandler_t sa_handler;
+    void* (sa_sigaction)(int, siginfo_t*, void*);
+  } __sigaction_handler;
+
+  #define sa_handler __sigaction_handler.sa_handler
+  #define sa_sigactin __sigaction_handler.sa_sigaction
+
+  sigset_t sa_mask; /* 触发信号函数时的掩码 */
+  int sa_flags;  /* 控制信号处理行为 */
+  void (*sa_restorer) (void); /* 该成员已弃用 */
+};
+```
+
+<img src="img/15.png" style="zoom:80%" />
 
 ### 信号集
 
+```cpp
+#include <bits/sigset.h>
+
+#define __SIG_SET_NWORDS (1024/(8*sizeof(unsigned long int)))
+
+typedef struct {
+  unsigned long int __val[_SIGSET_NWORDS];
+} __sigset_t;
+
+int sigemptyset(sigset_t* set);
+int sigfillset(sigset_t* set);
+int sigaddset(sigset_t* set, int signo);
+int sigdelset(sigset_t* set, int signo);
+int sigismember(const sigset_t* set, int signo);
+
+/**
+ * @brief 设置信号屏蔽字
+ * @param how 指定行为
+ *  SIG_BLOCK 新的信号屏蔽字是当前值和set指定的信号集的并集
+ *  SIG_UNBLOCK 新的信号屏蔽字是当前值和~set信号集的交集
+ *  SIG_SETMASK 直接设置信号屏蔽字为set
+ * @param set 信号集，如果为NULL，则该函数可用于查看当前信号集
+ * @param oset 返回之前的信号集
+ * @return 成功返回0，失败返回-1 
+ */
+int sigprocmask(int how, const sigset_t* set, sigset_t* oset);
+
+/**
+ * @brief 获取进程当前被挂起的信号集
+ * @param set 用于保存被挂起的信号集
+ * @return 成功返回0，失败返回-1 
+ */
+int sigpending(sigset_t* set);
+
+/**
+ * @brief 设置信号屏蔽字为sigmask，然后使进程休眠，这两个操作是一个原子操作，调用该函数休眠之后，如果进程捕获到了sigmask中没有屏蔽的任意信号，并且执行了对应的信号处理程序而且从该信号处理程序返回，则sigsuspend返回，并且把信号屏蔽字恢复为调用sigsuspend之前的值
+ */
+int sigsuspend(const sigset_t* sigmask);
+
+/**
+ * @将SIGABRT发送给本进程 
+ */
+void abort(void);
+```
+
 ### 统一事件源
 
+- 信号的产生是一个异步事件
+
+- 调用信号处理程序时，无论是使用signal函数还是sigaction函数，还是系统默认方式注册的信号处理程序，也无论使用sigaction函数时的信号屏蔽字sa_mask设置为了多少，该信号都会被系统阻塞，如果一次调用信号处理程序期间到达了多次该信号，系统也只会阻塞一个该信号，即信号处理程序返回后只会再捕获一次这个信号。
+
+- 如果信号处理程序太慢，则很可能发生上面的情况。解决方案是：把信号的主要处理逻辑放到程序主循环中，信号处理函数只是简单地通知主循环程序接收到信号，并把信号值传递给主循环，主循环再根据接收到的信号值执行目标信号对应的逻辑代码。
+
+- 信号处理函数通常使用管道来将信号传递给主循环，那么主循环怎么知道管道上何时有数据可读呢？只需要使用IO复用系统调用来监听管道的读端的可读事件即可，这样，信号事件就能和其他IO事件一样被处理，这就叫做统一事件源。
+
 ### 网络编程相关信号
+
+- SIGHUP: 
+  
+  - 当挂起进程的控制终端时，SIGHUP信号将被触发。
+  
+  - 守护进程没有控制终端，因此可以使用SIGHUP信号做其他事情，例如重新读取配置文件。
+
+- SIGPIPE: 
+
+  - 默认情况下，向一个读端关闭的管道或套接字连接中写数据，将会触发SIGPIPE信号，而该信号的默认行为是结束进程，因此我们需要自定义捕获它。
+  
+  - 引起SIGPIPE信号的写操作将设置errno为EPIPE。
+
+  - 可以使用send函数的MSG_NOSIGNAL标志来禁止写操作触发SIGPIPE信号。此时，我们应该使用send函数反馈的errno值来判断管道或socket的读端是否已经关闭。
+
+  - 此外，我们也可以利用IO复用系统调用来检测管道和socket的读端是否已经关闭。以poll为例，管道的读端关闭时，写端文件描述符上的POLLHUP事件将被触发。socket连接的对端关闭时，socket上的POLLRDHUP事件将被触发。
+
+- SIGURG:
+
+  - 内核通知应用程序带外数据到达的方式1：IO复用系统调用向应用程序报告事件，例如select向应用程序报告socket上的异常事件。
+
+  - 内核通知应用程序带外数据到达的方式2：使用SIGURG信号。
+
+  - 应用程序发送/接收带外数据的方法：send/recv函数附加MSG_OOB标志。
 
 ## 第 11 章 定时器
 
