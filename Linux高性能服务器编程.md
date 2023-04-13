@@ -1467,15 +1467,33 @@ void abort(void);
 
 ### socket选项SO_RCVTIMEO和SO_SNDTIMEO
 
+| 系统调用 | 有效选项 | 系统调用超时后的行为 |
+| --- | --- | --- |
+| send | SO_SNDTIMEO | 返回-1,设置errno为EAGAIN或EWOULDBLOCK |
+| sendmsg | SO_SNDTIMEO | 返回-1,设置errno为EAGAIN或EWOULDBLOCK |
+| recv | SO_RCVTIMEO | 返回-1,设置errno为EAGAIN或EWOULDBLOCK |
+| recvmsg | SO_RCVTIMEO | 返回-1,设置errno为EAGAIN或EWOULDBLOCK |
+| accept | SO_RCVTIMEO | 返回-1,设置errno为EAGAIN或EWOULDBLOCK |
+| connect | SO_SNDTIMEO | 返回-1,设置errno为EINPROGRESS |
+
+
 ### SIGALRM信号
 
-### IO复用系统调用的超时参数
+- alarm或setitimer函数产生
+
+- alarm触发后,需要重置闹钟
 
 ### 高性能定时器
 
 #### 时间轮
 
+- 单级时间轮
+
+- 多级时间轮
+
 #### 时间堆
+
+- 小根堆
 
 ## 第 12 章 高性能 I/O 框架库 libevent
 
@@ -1487,19 +1505,252 @@ void abort(void);
 
 ### fork系统调用
 
+```cpp
+#include <sys/types.h>
+#include <unistd.h>
+
+pid_t fork(void);
+```
+
 ### exec系列系统调用
+
+```cpp
+#include <unistd.h>
+extern char** environ;
+
+// path指定可执行文件的完整路径,file参数可接收文件名,该文件的具体位置则在环境变量PATH中搜寻
+// arg接收可变参数,argv则接收参数数组
+// envp参数用于设置新程序的环境变量,如果未设置它,则新程序将使用由全局变量environ指定的环境变量
+int execl(const char* path, const char* arg, ...);
+int execlp(const char* file, const char* arg, ...);
+int execle(const char* path, const char* arg, ..., char* const envp[]);
+int execv(const char* path, char* const argv[]);
+int execvp(const char* file, char* const argv[]);
+int execve(const char* path, char* const argv[], char* const envp[]);
+```
+
+- 一般情况下,exec函数是不返回的,除非出错,出错时返回-1,并设置errno.如果没出错则原程序中的exec调用之后的代码都不会执行.因为此时原程序已经被exec的参数指定的程序完全替换(包括代码和数据)
+
+- exec函数不会关闭原程序打开的文件描述符,除非该文件描述符被设置了类似SOCK_CLOSEEXEC的属性.
 
 ### 处理僵尸进程
 
+- 僵尸进程的定义:子进程结束了,而父进程还在运行,而且父进程没有回收子进程的资源,此时子进程成为僵尸进程
+
+- 处理僵尸进程:子进程结束时会向父进程发送SIGCHLD信号,父进程可以捕捉该信号,调用wait/waitpid函数回收子进程的资源,使子进程的僵尸态立即结束
+
+```cpp
+#include <sys/types.h>
+#include <sys/wait.h>
+
+pid_t wait(int* stat_loc);
+
+// options常用取值WNOHANG,此时waitpid将是非阻塞的
+// pid = -1: wait任意子进程
+// pid < -1: wait指定进程组
+// pid >  0: wait指定进程
+// pid =  0: wait本组的任意子进程
+pid_t waitpid(pid_t pid, int* stat_loc, int options);
+```
 ### 管道
+
+- pipe创建的管道,考虑到可移植性,必须认为是单向的,数据只能从fd[1]写入,流向fd[0],然后从fd[0]读取.
+
+- socketpair创建的管道是全双工的
+
+- 父子进程利用管道通信的方式:以父进程向子进程发送数据为例,父进程pipe,fork出子进程,然后父进程关闭fd[0],子进程关闭fd[1],父进程就可以通过fd[1]向子进程发送数据了,子进程可以在fd[0]上读取到该数据
 
 ### 信号量
 
+```cpp
+#include <sys/sem.h>
+
+// 该结构用于描述IPC对象（信号量集、共享内存和消息队列）的权限
+struct ipc_perm {
+  key_t key;    /*> 键值 */
+  uid_t uid;    /*> 所有者的有效用户ID */
+  gid_t gid;    /*> 所有者的有效组ID */
+  uid_t cuid;   /*> 创建者的有效用户ID */
+  gid_t cgid;   /*> 创建者的有效组ID */
+  mode_t mode;  /*> 访问权限 */
+                /*> 省略其他填充字段 */
+};
+
+struct semid_ds {
+  struct ipc_perm sem_perm; /*> 信号量集的操作权限 */
+  unsigned long int sem_nsems; /*> 该信号量集中的信号量数目 */
+  time_t sem_otime; /*> 最后一次调用semop的时间 */
+  time_t sem_ctime; /*> 最后一次调用semctl的时间 */
+                    /*> 省略其他填充字段 */
+}
+
+/**
+ * @brief 创建或获取一个新的信号量集
+ * @param key 标识信号量集，类似于文件路径
+ * @param num_sems 指定创建/获取的信号量集中信号量的数目。如果是创建信号量，该值必须指定，如果是获取信号量，该值可以设为0
+ * @param sem_flags 指定一组标志，低9位代表信号集权限，其他标志还有IPC_CREAT、IPC_EXCL等
+ * @return 成功时返回一个正整数，他是信号量集的标识符，失败时返回-1
+ */
+int semget(key_t key, int num_sems, int sem_flags);
+
+/**
+ * @brief 对信号量集执行PV操作
+ * @param sem_id 信号量集标识符
+ * @param sem_ops 指向操作数组
+ * @param num_sem_ops 操作数组的长度
+ * @return 成功时返回0，失败时返回-1，失败时sem_ops数组中指定的所有操作都不被执行
+ */
+int semop(int sem_id, struct sembuf* sem_ops, size_t num_sem_ops);
+
+struct sembuf {
+  unsigned short int sem_num; /*> 信号集中信号量的编号 */
+  short int sem_op; /*> 操作类型 */
+  short int sem_flg;  /*> 可选项有IPC_NOWAIT、SEM_UNDO */
+};
+
+/**
+ * @brief 控制信号量
+ * @param sem_id 信号量集标识符
+ * @param sem_num 信号量在信号量集中的编号
+ * @param command 指定要执行的命令
+ * @param arg 可选，根据推荐格式（semun）传入 
+ */
+int semctl(int sem_id, int sem_num, int command, ...);
+
+union semun {
+  int val;  /*> 用于SETVAL命令 */
+  struct semid_ds* buf; /*> 用于IPC_STAT和IPC_SET命令 */
+  unsigned short int* array; /*> 用于GETALL和SETALL命令 */
+  struct seminfo* __buf; /*> 用于IPC_INFO命令 */
+}
+
+struct seminfo {
+  int semmap; /*> linux内核没有使用 */
+  int semmni; /*> 系统最多可以拥有的信号量集数目 */
+  int semmns; /*> 系统最多可以拥有的信号量数目 */
+  int semmnu; /*> linux内核没有使用 */
+  int semmsl; /*> 一个信号量集最多允许包含的信号量数目 */
+  int semopm; /*> semop一次最多能执行的sem_op操作数目 */
+  int semume; /*> linux内核没有使用 */
+  int semusz; /*> sem_undo结构体的大小 */
+  int semvmx; /*> 最大允许的信号量值 */
+  int semaem; /*> 最多允许的UNDO次数（带SEM_UNDO标志的semop操作的次数） */
+};
+```
+
+- 每个信号量由一个无名结构表示，它至少包含下列成员
+
+```cpp
+struct {
+  unsigned short semval;  /*> 信号量的值 */
+  pid_t sempid;           /*> 最后一次执行semop操作的进程ID */
+  unsigned short semncnt; /*> 等待信号量值增加的进程数量 */
+  unsigned short semzcnt; /*> 等待信号量值变为0的进程数量 */
+};
+```
+
+- 使用semget创建信号量时对semid_ps结构体的初始化
+
+  - sem_perm.cuid和sem_perm.uid设置为调用semget函数的进程的有效用户ID
+
+  - sem_perm.cgid和sem_perm.gid设置为调用semget函数的进程的有效组ID
+
+  - sem_perm.mode低9位设置为sem_flags参数的低9位
+
+  - sem_nsems设置为num_sems
+
+  - sem_otime设置为0
+  
+  - sem_ctime设置为当前时间
+
+- semget的key参数如果时IPC_PRIVATE(其值为0)，这样无论该信号量是否已经存在，semget都将创建一个新的信号量、其语义更适合命名为IPC_NEW，创建出来的信号量并非像名字一样时进程私有的，其他进程也有方法访问它。
+
+- sembuf::sem_op
+
+  - 大于0表示释放相应数量的资源，只要对信号量集具有写权限就一定会非阻塞的完成
+  
+  - 小于0表示申请获取相应数量的资源，如果该操作是阻塞的，资源不足时会将 semncnt 加一，然后阻塞等待资源充足。如果该操作是非阻塞的，资源不足时立刻出错返回EAGAIN。
+
+  - 等于0表示等待信号量的值变为0，如果该操作是阻塞的，资源不为0时会将 semzcnt 加一，然后阻塞等待资源变为0。如果该操作时非阻塞的，资源非0时立刻出错返回EAGAIN。
+
+- sembuf::sem_flg
+
+  - IPC_NOWAIT: 指定该pv操作是非阻塞的,例如p操作，资源数量不够，则非阻塞时出错返回EAGAIN
+
+  - SEM_UNDO: 如果进程终止，它占用了由信号量分配的资源，这就会导致问题。为信号量操作指定SEM_UNDO标志之后再分配资源（P操作），那么内核会记住对与该信号量，分配给调用进程多少资源。当该进程终止时，不论是否自愿，内核都将检验该进程是否还具有尚未处理的信号量调整值，如果有，则按该值对相应信号量进行处理。
+
+  - 如果用待SETVAL或SETALL命令的semctl设置信号量的值，则所有使用该信号量的进程的调整值都将设置为0。
+
+- semctl::cmd，注意针对整个信号量集的操作会忽略sem_num参数
+
+  - IPC_STAT: 获取semid_ds结构，存储在semun.buf指向的结构中
+
+  - IPC_SET: 将semun.buf中的部分成员复制到内核中信号量集的semid_ds结构，同时更新semid_ds.sem_ctime
+
+  - IPC_RMID: 立即移除信号量集，唤醒所有等待该信号量的进程
+
+  - IPC_INFO: 获取系统信号量资源配置信息，结果存储在semun.__buf中
+
+  - SEM_INFO: 与IPC_INFO类似，不过semun.__buf->semusz被设置为系统目前拥有的信号量集数目，而semnu.__buf->semaem被设置为系统目前拥有的信号量数目
+
+  - SEM_STAT: 与IPC_STAT类似，不过sem_id参数不再表示信号量集标识符，而是内核中信号量集数组的索引（系统的所有信号量集都是该数组中的一项）
+
+  - GETALL: 将由sem_id标识的信号量集中的所有信号量的semval值导出到semun.array中
+
+  - GETNCNT: 获取信号量的semncnt值
+
+  - GETPID: 获取信号量的sempid值
+
+  - GETVAL: 获取信号量的semval值
+
+  - GETZCNT: 获取信号量的semzcnt值
+
+  - SETALL: 用semun.array中的数据填充由sem_id标识的信号量集中的所有信号量的semval的值，同时更新semid_ds.sem_ctime
+
+  - SETVAL: 将信号量的semval值设置为semun.val,同时更新semid_ds.sem_ctime
+
 ### 共享内存
+
+```cpp
+#include <sys/shm.h>
+
+/**
+ * @brief 创建或获取一个新的共享内存
+ * @param key 标识共享内存，类似于文件路径
+ * @param size 指定共享内存的大小，单位是字节，如果是创建，size必须指定，如果是获取，size可为0
+ * @param shm_flags 指定一组标志，低9位代表信号集权限，其他标志还有IPC_CREAT、IPC_EXCL、SHM_HUGETLB、SHM_NORESERVE
+ *  SHM_HUGETLB：类似于mmap的MAP_HUGETLB标志，系统将使用“大页面”来为共享内存分配空间
+ *  SHM_NORESERVE：类似于mmap的MAP_NORESERVE标志，不为共享内存保留交换分区（swap分区）。当物理内存不足时，对该共享内存的写操作将触发SIGSEGV信号。
+ * @return 成功时返回一个正整数，他是共享内存的标识符，失败时返回-1
+ */
+int shmget(key_t key, size_t size, int shmflg);
+
+struct shmid_ds {
+  struct ipc_perm shm_perm; /*> 共享内存的操作权限 */
+  size_t shm_segsz;   /*> 共享内存大小，单位是字节 */
+  __time_t shm_atime; /*> 对这段内存最后一次调用shmat的时间 */
+  __time_t shm_dtime; /*> 对这段内存最后一次调用shmdt的时间 */
+  __time_t shm_ctime; /*> 对这段内存最后一次调用shmctl的时间 */
+  __pid_t shm_cpid;   /*> 创建者的PID */
+  __pid_t shm_lpid;   /*> 最后一次执行shmat或shmdt操作的进程的PID */
+  shmatt_t shm_attach;/*> 目前关联到此共享内存的进程数量 */
+  /* 省略一些填充字段 */
+};
+
+void* shmat(int shm_id, const void* shm_addr, int shmflg);
+
+int shmdt(const void* shm_addr);
+
+int shmctl(int shm_id, int command, struct shmid_ds* buf);
+```
 
 ### 消息队列
 
 ### IPC命令
+
+- ipcs命令：查看系统中当前拥有哪些共享资源实例
+
+- ipcrm命令：删除遗留在系统中的共享资源
 
 ### 在进程间传递文件描述符
 
@@ -1507,19 +1758,182 @@ void abort(void);
 
 ### Linux线程概述
 
+#### 线程模型
+
+- M:1线程模型：M个用户态线程对应一个内核线程，内核线程无法感知用户态线程的存在，用户态线程之间的切换完全由用户层实现，例如setjmp，longjmp等方式。优点是用户线程切换无需进入内核态，开销很小，缺点是无法充分利用多处理器的特性，而且一个用户线程的阻塞可能会导致整个进程都被阻塞。
+
+- 1:1线程模型：每个用户态线程都对应一个内核线程，优点是充分利用了多处理器，缺点是线程切换开销变大。
+
+- M:N线程模型：M个用户态线程对应到N个内核线程，M>=N，是一种折中方案。
+
+#### linux上的线程库
+
+- LinuxThreads
+  
+  - 采用1对1模型。
+  
+  - 内核线程是用clone系统调用创建的进程模拟的。
+  
+  - clone系统调用和fork类似，创建调用进程的子进程。不过可以为clone调用指定CLONE_THREAD标志，此时创建的子进程与调用进程共享相同的虚拟地址空间、文件描述符和信号处理函数，这些都是线程的特点，但用进程模拟内核线程会导致很多语义问题，例如：
+
+    - 每个线程拥有不同的PID，因此不符合POSIX规范
+
+    - Linux信号处理本来是基于进程的，但现在一个进程内部的所有线程都能而且必须处理信号
+
+    - 用户ID、组ID对一个进程中的不同线程来说可能是不一样的
+
+    - 程序产生的核心转储文件不会包含所有线程的信息，而只包含产生该核心转储文件的线程的信息。
+
+    - 由于每个线程都是一个进程，因此系统允许的最大进程数也就是最大线程数
+
+  - LinuxThreads线程库一个有名的特性是所谓的管理线程。它是进程中专门用于管理其他工作线程的线程。管理线程的引入额外增加了系统开销。
+
+- NPTL
+
+  - 真正的内核线程库，内核线程不再是一个进程，因此避免了很多用进程模拟内核线程导致的语义问题。
+
+  - 摒弃了管理线程，终止线程，回收线程堆栈等工作都可以由内核来完成。
+
+  - 由于不存在管理线程，所以一个进程的线程可以运行在不同的CPU上，从而充分利用了多处理器的优势。
+
+  - 线程的同步由内核完成。隶属于不同进程的线程之间也能共享互斥锁，因此可实现跨进程的线程同步。
+
 ### 创建线程和结束线程
+
+```cpp
+#include <pthread.h>
+
+int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void*(*start_routine)(void*), void* arg);
+void pthread_exit(void* retval);
+int pthread_join(pthread_t thread, void** retval);
+int pthread_cancel(pthread_t thread);
+int pthread_setcancelstate(int state, int* oldstate); // PTHREAD_CANCEL_ENABLE(允许取消)，PTHREAD_CANCEL_DISABLE(禁止取消)
+int pthread_setcanceltype(int type, int* oldstate); // PTHREAD_CANCEL_ASUNCHRONOUS(线程随时都可以被取消)，PTHREAD_CANCEL_DEFERRED(线程运行到取消点才会检查自己是否被取消)
+```
 
 ### 线程属性
 
+```cpp
+#include <bits/pthreadtypes.h>
+
+#define __SIZEOF_PTHREAD_ATTR_T 36
+typedef union {
+  char __size[__SIZEOF_PTHREAD_ATTR_T];
+  long int __align;
+} pthread_attr_t;
+
+#include <pthread.h>
+
+int pthread_attr_init(pthread_attr_t* attr);
+int pthread_attr_destory(pthread_attr_t* attr);
+
+int pthread_attr_getdetachstate(const pthread_attr_t* attr, int* detachstate);
+int pthread_attr_setdetachstate(pthread_attr_t* attr, int detachstate);
+
+int pthread_attr_getstackaddr(const pthread_attr_t* attr, void** stackaddr);
+int pthread_attr_setstackaddr(pthread_attr_t* attr, void* stackaddr);
+
+int pthread_attr_getstacksize(const pthread_attr_t* attr, size_t* stacksize);
+int pthread_attr_setstacksize(pthread_attr_t* attr, size_t stacksize);
+
+int pthread_attr_getstack(const pthread_attr_t* attr, void** stackaddr, size_t* stacksize);
+int pthread_attr_setstack(pthread_attr_t* attr, void* stackaddr, size_t stacksize);
+
+int pthread_attr_getguardsize(const pthread_attr_t* attr, size_t* guardsize);
+int pthread_attr_setguardsize(pthread_attr_t* attr, size_t guardsize);
+
+// 线程调度参数。目前sched_param仅由一个成员sched_priority
+int pthread_attr_getschedparam(const pthread_attr_t* attr, struct sched_param* param);
+int pthread_attr_setschedparam(pthread_attr_t* attr, const struct sched_param* param);
+
+// 线程调度策略: SCHED_FIFO/SCHED_RR/SCHED_OTHER(默认值)。rr表示采用轮转算法调度，fifo表示使用先进先出算法调度，这两种方法都具备实时调度功能，但只能用于以超级用户身份运行的进程。
+int pthread_attr_getschedpolicy(const pthread_attr_t* attr, int* policy);
+int pthread_attr_setschedpolicy(pthread_attr_t* attr, int policy);
+
+// 是否继承创建本线程的线程的调度属性：PTHREAD_INHERIT_SCHED/PTHREAD_EXPLICIT_SHCED
+int pthread_attr_getinheritsched(const pthread_attr_t* attr, int* inherit);
+int pthread_attr_setinheritsched(pthread_attr_t* attr, int inherit);
+
+// 线程间竞争CPU的范围，即线程优先级的有效范围：PTHREAD_SCOPE_SYSTEM/PTHREAD_SCOPE_PROCESS。前者表示目标线程与系统中所有线程一起竞争CPU，后者表示目标线程仅与其他本进程中的线程竞争CPU，目前linux仅支持PTHREAD_SCOPE_SYSTEM选项。
+int pthread_attr_getscope(const pthread_attr_t* attr, int* scope);
+int pthread_attr_setscope(pthread_attr_t* attr, int scope);
+```
+
 ### POSIX信号量
+
+```cpp
+#include <semaphore.h>
+
+int sem_init(sem_t* sem, int pshared, unsigned int value);
+int sem_destroy(sem_t* sem);
+int sem_wait(sem_t* sem);
+int sem_trywait(sem_t* sem);
+int sem_post(sem_t* sem);
+```
 
 ### 互斥锁
 
+```cpp
+#include <pthread.h>
+
+int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t* mutexattr);
+int pthread_mutex_destroy(pthread_mutex_t* mutex);
+int pthread_mutex_lock(pthread_mutex_t* mutex);
+int pthread_mutex_trylock(pthread_mutex_t* mutex);
+int pthread_mutex_unlock(pthread_mutex_t* mutex);
+
+// 宏初始化
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// 互斥锁属性
+int pthread_mutexattr_init(pthread_mutexattr_t* attr);
+int pthread_mutexattr_destroy(pthread_mutexattr_t* attr);
+
+// 跨进程共享：PTHREAD_PROCESS_SHARED / PTHREAD_PROCESS_PRIVATE
+int pthread_mutexattr_getpshared(const pthread_mutexattr_t* attr, int* pshared);
+int pthread_mutexattr_setpshared(pthread_mutexattr_t* attr, int pshared);
+
+// 指定互斥锁类型
+// PTHREAD_MUTEX_NORMAL: 普通锁，默认类型
+// PTHREAD_MUTEX_ERRORCHECK: 检错锁，此互斥量类型提供错误检查。
+// PTHREAD_MUTEX_RECURSIVE: 递归锁，允许递归
+// PTHREAD_MUTEX_DEFAULT: 默认锁。实现时可能被映射到前面三种锁之一
+int pthread_mutexattr_gettype(const pthread_mutexattr_t* attr, int* type);
+int pthread_mutexattr_settype(pthread_mutexattr_t* attr, int type);
+```
+
 ### 条件变量
 
-### 线程同步机制包装类
+```cpp
+#include <pthread.h>
+
+int pthread_cond_init(pthread_cond_t* cond, const pthread_condaddr_t* cond_addr);
+int pthread_cond_destory(pthread_cond_t* cond);
+int pthread_cond_broadcast(pthread_cond_t* cond);
+int pthread_cond_signal(pthread_cond_t* cond);
+int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex);
+
+// 宏初始化
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+```
 
 ### 多线程环境
+
+- 线程安全函数：如果一个函数能被多个线程同时调用而不发生竞态条件，则我们称它是线程安全的。linux库函数只有一小部分是线程不可重入的，一般原因都是因为其内部使用了静态变量。
+
+- 异步信号安全函数：
+
+- 可重入函数：在函数执行过程中，由于信号进入了信号处理程序，在信号处理程序中又调用了该函数，最后无错误发生，则该函数是可重入的。linux库函数中可重入函数很少。
+
+- 不可重入的原因：
+
+  - 使用了malloc/free
+
+  - 使用了标准IO函数，标准IO函数会修改一些全局变量，例如偏移量等
+
+  - 使用了不可重入的锁
+
+- 可重入函数必然是线程安全函数和异步信号安全函数；线程安全函数不一定是可重入函数。
 
 ## 第 15 章 进程池和线程池
 
